@@ -1,53 +1,59 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { generateSoalDariGroq, jawabPertanyaanGroq } = require('./service/groqService');
+const bodyParser = require('body-parser');
+const fetch = require('node-fetch'); // untuk request ke Groq/OpenAI
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-// Konfigurasi CORS – sesuaikan domain frontend kamu
-const corsOptions = {
-  origin: 'https://lifeplan-nine.vercel.app', // Ganti dengan domain frontend Vercel kamu
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type'],
-};
-app.use(cors(corsOptions));
+// Middleware
+app.use(cors()); // Izinkan akses dari domain lain (Vercel, dll)
+app.use(bodyParser.json());
 
-app.use(express.json());
-
-// Route: generate soal
-app.post('/generate-soal', async (req, res) => {
-  const { materi } = req.body;
-  if (!materi) return res.status(400).json({ error: "Materi tidak boleh kosong." });
-
-  try {
-    const soalList = await generateSoalDariGroq(materi);
-    res.json({ soalList });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Route: jawaban AI
+// Endpoint untuk menerima pesan dari frontend
 app.post('/ask-groq', async (req, res) => {
-  const { messages } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: "Messages harus array." });
-  }
-
   try {
-    const answer = await jawabPertanyaanGroq(messages);
-    res.json({ answer });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const { messages } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Messages harus array.' });
+    }
+
+    // Ganti dengan key & model yang sesuai (misal Groq atau OpenAI)
+    const apiKey = process.env.GROQ_API_KEY;
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'mixtral-8x7b-32768', // atau 'gpt-3.5-turbo' jika pakai OpenAI
+        messages,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Groq error:', text);
+      return res.status(500).json({ error: 'Gagal mengambil respon dari Groq' });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'Tidak ada jawaban.';
+
+    res.json({ reply });
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Cek .env
-console.log('Menggunakan API Key:', process.env.GROQ_API_KEY ? 'TERISI ✅' : 'TIDAK TERISI ❌');
+app.get('/', (req, res) => {
+  res.send('LifePlanCalc AI Backend aktif!');
+});
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server berjalan di port ${PORT}`);
 });
