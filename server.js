@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const { generateSoalDariGroq, jawabPertanyaanGroq } = require('./service/groqService');
@@ -7,10 +6,17 @@ const { generateSoalDariGroq, jawabPertanyaanGroq } = require('./service/groqSer
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Konfigurasi CORS – sesuaikan domain frontend kamu
+const corsOptions = {
+  origin: 'https://lifeplan-nine.vercel.app', // Ganti dengan domain frontend Vercel kamu
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+};
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
-// Route untuk generate soal
+// Route: generate soal
 app.post('/generate-soal', async (req, res) => {
   const { materi } = req.body;
   if (!materi) return res.status(400).json({ error: "Materi tidak boleh kosong." });
@@ -23,7 +29,7 @@ app.post('/generate-soal', async (req, res) => {
   }
 });
 
-// Route untuk bertanya ke Groq
+// Route: jawaban AI
 app.post('/ask-groq', async (req, res) => {
   const { messages } = req.body;
   if (!messages || !Array.isArray(messages)) {
@@ -38,10 +44,10 @@ app.post('/ask-groq', async (req, res) => {
   }
 });
 
-// Cek apakah .env bekerja
+// Cek .env
 console.log('Menggunakan API Key:', process.env.GROQ_API_KEY ? 'TERISI ✅' : 'TIDAK TERISI ❌');
 
-// Mulai server
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server jalan di port ${PORT}`);
+  console.log(`Server berjalan di port ${PORT}`);
 });
